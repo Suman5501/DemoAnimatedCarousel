@@ -1,11 +1,14 @@
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, FlatList, Dimensions, Image } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { StyleSheet, Text, View, FlatList, Dimensions, Image, Animated } from 'react-native';
 import { getMovies } from './src/apis/movieapi';
 import { Rating } from './src/components/Rating';
 
 const { width, height } = Dimensions.get('window');
-const SIZE = width * 3 / 4;
+const SIZE = width * 3 / 4; //75%
+const SPACE_ITEM_SIZE = (width - SIZE) / 2;
+const EMPTY_ITEM_SIZE = (width - SIZE) / 2;
+
 const Loading = () => {
   return (
     <View style={styles.loadingContainer}>
@@ -16,11 +19,13 @@ const Loading = () => {
 export default function App() {
 
   const [movies, setMovies] = useState([]);
+  const scrollX = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const fetchData = async () => {
       const movies = await getMovies();
-      setMovies(movies);
+      //[spacer, ...movies, sapcer]
+      setMovies([{ key: 'left-spacer' }, ...movies, { key: 'right-spacer' }]);
     };
     if (movies.length === 0) {
       fetchData(movies);
@@ -33,7 +38,7 @@ export default function App() {
   return (
     <View style={styles.container}>
       <StatusBar translucent />
-      <FlatList
+      <Animated.FlatList
         showsHorizontalScrollIndicator={false}
         data={movies}
         horizontal
@@ -41,13 +46,40 @@ export default function App() {
         contentContainerStyle={{
           alignItems: 'center'
         }}
-        renderItem={({ item }) => {
+        snapToInterval={SIZE}
+        snapToAlignment='start'
+        decelerationRate={0}
+        bounces={false}
+
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+          { useNativeDriver: true }
+        )}
+        scrollEventThrottle={16}
+        renderItem={({ item, index }) => {
+
+          if (!item.poster) {
+            return <View style={{
+              width: SPACE_ITEM_SIZE,
+            }} />
+          }
+          const inputRange = [
+            (index - 2) * SIZE,
+            (index - 1) * SIZE,
+            (index) * SIZE,
+          ];
+          const translateY = scrollX.interpolate({
+            inputRange,
+            outputRange: [0, -50, 0],
+            extrapolate: 'clamp'
+          })
           return (
             <View style={{ width: SIZE }}>
-              <View style={{
+              <Animated.View style={{
                 marginHorizontal: 10,
                 padding: 20,
                 alignItems: 'center',
+                transform: [{ translateY }],
                 backgroundColor: 'white',
                 borderRadius: 30,
               }}>
@@ -64,7 +96,7 @@ export default function App() {
                 <Text style={{ fontSize: 12 }} numberOfLines={3}>
                   {item.descriptioon}
                 </Text>
-              </View>
+              </Animated.View>
             </View>
 
           );
